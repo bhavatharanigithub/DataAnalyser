@@ -1,0 +1,6 @@
+streamlit
+pandas 
+hashlib
+sqlite3
+sqlalchemy 
+plotly.express
