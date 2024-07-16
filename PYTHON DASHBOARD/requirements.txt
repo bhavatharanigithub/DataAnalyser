@@ -3,4 +3,5 @@ pandas
 plotly
 sqlalchemy
 pymysql
-mysql-connector-python
+mysqlclient
+
