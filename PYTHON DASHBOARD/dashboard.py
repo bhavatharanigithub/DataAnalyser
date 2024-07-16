@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import hashlib
-import sqlite3
+import mysql.connector
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 import plotly.express as px
@@ -10,7 +10,9 @@ import plotly.express as px
 def login(db_conn, email, password):
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     cursor = db_conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+
+    # Use %s as placeholder for email
+    cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
     user = cursor.fetchone()
     
     if user:
@@ -28,20 +30,19 @@ def signup(db_conn, username, email, password):
     cursor = db_conn.cursor()
     
     try:
-        cursor.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', (username, email, hashed_password))
+        cursor.execute('INSERT INTO users (username, email, password) VALUES (%s, %s, %s)', (username, email, hashed_password))
         db_conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except mysql.connector.IntegrityError:
         return False
 
 # Function to load data from SQL database
-def load_data_from_sql(db_engine, query):
-    try:
-        with db_engine.connect() as connection:
-            df = pd.read_sql(query, connection)
-        return df
-    except OperationalError:
-        return None
+def load_data_from_sql(db_conn, query):
+    cursor = db_conn.cursor()
+    cursor.execute(query)
+    records = cursor.fetchall()
+    df = pd.DataFrame(records, columns=[desc[0] for desc in cursor.description])
+    return df
 
 # Function to show login page
 def show_login_page(db_conn):
@@ -80,42 +81,35 @@ def show_signup_page(db_conn):
             st.warning("Please enter username, email, and password")
 
 # Function to show analysis page
-def show_analysis_page():
+def show_analysis_page(db_conn):
     st.title(":bar_chart: Energy Data Analysis")
 
-    # Connect to SQL database
-    db_engine = None
-    try:
-        db_engine = create_engine('mysql+pymysql://root:root@localhost:3308/assignment')  # Update with your database details
-        query = "SELECT * FROM jsondata"  # Update with your table name
-        df = load_data_from_sql(db_engine, query)
-    except OperationalError:
-        st.warning("MySQL connection failed. Falling back to SQLite.")
-        db_engine = create_engine('sqlite:///fallback.db')
-        # Provide logic to load or initialize SQLite data if MySQL is not available
-        query = "SELECT * FROM jsondata"
-        df = load_data_from_sql(db_engine, query)
+    # Query to retrieve data
+    query = "SELECT * FROM jsondata"
+    df = load_data_from_sql(db_conn, query)
 
-    if df is not None:
+    if not df.empty:
         # Remove leading and trailing spaces in all string columns
         df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
         
         # Handle null values
-        df['end_year'].fillna('Unknown', inplace=True)
-        df['intensity'].fillna(0, inplace=True)
-        df['sector'].fillna('Unknown', inplace=True)
-        df['topic'].fillna('Unknown', inplace=True)
-        df['insight'].fillna('No Insight', inplace=True)
-        df['url'].fillna('No URL', inplace=True)
-        df['region'].fillna('Unknown', inplace=True)
-        df['start_year'].fillna('Unknown', inplace=True)
-        df['impact'].fillna('No Impact', inplace=True)
-        df['country'].fillna('Unknown', inplace=True)
-        df['relevance'].fillna(0, inplace=True)
-        df['pestle'].fillna('Unknown', inplace=True)
-        df['source'].fillna('Unknown', inplace=True)
-        df['title'].fillna('No Title', inplace=True)
-        df['likelihood'].fillna(0, inplace=True)
+        df.fillna({
+            'end_year': 'Unknown',
+            'intensity': 0,
+            'sector': 'Unknown',
+            'topic': 'Unknown',
+            'insight': 'No Insight',
+            'url': 'No URL',
+            'region': 'Unknown',
+            'start_year': 'Unknown',
+            'impact': 'No Impact',
+            'country': 'Unknown',
+            'relevance': 0,
+            'pestle': 'Unknown',
+            'source': 'Unknown',
+            'title': 'No Title',
+            'likelihood': 0
+        }, inplace=True)
 
         # Ensure 'published' field is used as the date field
         if "published" in df.columns:
@@ -206,35 +200,31 @@ def main():
     st.set_page_config(page_title="Energy Data Analysis Dashboard", layout="wide")
     
     # Attempt to connect to MySQL
-    db_conn = None
     try:
-        db_engine = create_engine('mysql+pymysql://root:root@localhost:3308/assignment')  # Update with your database details
-        db_conn = db_engine.connect()
-        db_conn.close()
-        db_conn = sqlite3.connect('fallback.db')  # Fallback SQLite database
+        db_conn = mysql.connector.connect(
+            host="localhost",
+            port=3308,
+            user="root",
+            password="root",
+            database="assignment"
+        )
         cursor = db_conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS users
-                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                           username TEXT NOT NULL,
-                           email TEXT NOT NULL UNIQUE,
-                           password TEXT NOT NULL)''')
+                          (id INT AUTO_INCREMENT PRIMARY KEY,
+                           username VARCHAR(255) NOT NULL,
+                           email VARCHAR(255) NOT NULL UNIQUE,
+                           password VARCHAR(255) NOT NULL)''')
         db_conn.commit()
-    except OperationalError:
-        st.warning("MySQL connection failed. Using fallback SQLite database.")
-        db_conn = sqlite3.connect('fallback.db')
-        cursor = db_conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS users
-                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                           username TEXT NOT NULL,
-                           email TEXT NOT NULL UNIQUE,
-                           password TEXT NOT NULL)''')
-        db_conn.commit()
-
+    except mysql.connector.Error as err:
+        st.warning(f"Error: {err}")
+        st.warning("MySQL connection failed. Check your connection details.")
+        return
+    
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
     
     if st.session_state['logged_in']:
-        show_analysis_page()
+        show_analysis_page(db_conn)
     else:
         login_or_signup = st.sidebar.radio("Login or Sign-Up", ("Login", "Sign-Up"))
         if login_or_signup == "Login":
@@ -244,6 +234,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
