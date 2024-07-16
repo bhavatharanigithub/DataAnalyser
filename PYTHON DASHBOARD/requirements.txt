@@ -1,3 +1,6 @@
 streamlit
-pandas 
-sqlalchemy 
+pandas
+plotly
+sqlalchemy
+pymysql
+
