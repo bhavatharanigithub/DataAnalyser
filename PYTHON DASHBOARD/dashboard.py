@@ -36,9 +36,12 @@ def signup(db_conn, username, email, password):
 
 # Function to load data from SQL database
 def load_data_from_sql(db_engine, query):
-    with db_engine.connect() as connection:
-        df = pd.read_sql(query, connection)
-    return df
+    try:
+        with db_engine.connect() as connection:
+            df = pd.read_sql(query, connection)
+        return df
+    except OperationalError:
+        return None
 
 # Function to show login page
 def show_login_page(db_conn):
@@ -217,8 +220,8 @@ def main():
                            password TEXT NOT NULL)''')
         db_conn.commit()
     except OperationalError:
-        st.error("MySQL connection failed. Falling back to SQLite.")
-        db_conn = sqlite3.connect('fallback.db')  # Fallback SQLite database
+        st.warning("MySQL connection failed. Using fallback SQLite database.")
+        db_conn = sqlite3.connect('fallback.db')
         cursor = db_conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS users
                           (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,23 +229,22 @@ def main():
                            email TEXT NOT NULL UNIQUE,
                            password TEXT NOT NULL)''')
         db_conn.commit()
-    
-    # Show login or sign-up page if not logged in
+
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
     
     if st.session_state['logged_in']:
         show_analysis_page()
     else:
-        page = st.sidebar.selectbox("Select Page", ["Login", "Sign-Up"])
-        
-        if page == "Login":
+        login_or_signup = st.sidebar.radio("Login or Sign-Up", ("Login", "Sign-Up"))
+        if login_or_signup == "Login":
             show_login_page(db_conn)
-        elif page == "Sign-Up":
+        else:
             show_signup_page(db_conn)
 
 if __name__ == "__main__":
     main()
+
 
 
 
