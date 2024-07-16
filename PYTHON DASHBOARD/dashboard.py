@@ -3,6 +3,7 @@ import pandas as pd
 import hashlib
 import sqlite3
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 import plotly.express as px
 
 # Function to handle login
@@ -12,12 +13,8 @@ def login(db_conn, email, password):
     cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
     user = cursor.fetchone()
     
-    st.write(f"Email: {email}")
-    st.write(f"Hashed Password: {hashed_password}")
-    
     if user:
         stored_password = user[3]  # Ensure this index is correct for the password column
-        st.write(f"Stored Password: {stored_password}")
         if stored_password == hashed_password:
             return user
         else:
@@ -84,14 +81,18 @@ def show_analysis_page():
     st.title(":bar_chart: Energy Data Analysis")
 
     # Connect to SQL database
-    db_engine = create_engine('mysql+pymysql://root:root@localhost:3308/assignment')  # Update with your database details
+    db_engine = None
+    try:
+        db_engine = create_engine('mysql+pymysql://root:root@localhost:3308/assignment')  # Update with your database details
+        query = "SELECT * FROM jsondata"  # Update with your table name
+        df = load_data_from_sql(db_engine, query)
+    except OperationalError:
+        st.warning("MySQL connection failed. Falling back to SQLite.")
+        db_engine = create_engine('sqlite:///fallback.db')
+        # Provide logic to load or initialize SQLite data if MySQL is not available
+        query = "SELECT * FROM jsondata"
+        df = load_data_from_sql(db_engine, query)
 
-    # SQL query to retrieve data
-    query = "SELECT * FROM jsondata"  # Update with your table name
-
-    # Load data from SQL
-    df = load_data_from_sql(db_engine, query)
-    
     if df is not None:
         # Remove leading and trailing spaces in all string columns
         df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
@@ -193,36 +194,48 @@ def show_analysis_page():
                 st.write("### Intensity vs Likelihood")
                 fig = px.scatter(df_filtered, x="intensity", y="likelihood", size="relevance", color="country", title='Bubble Plot of Intensity vs Likelihood')
                 st.plotly_chart(fig)
+    
+    else:
+        st.warning("No data found.")
 
-
-# Main function for Streamlit app
+# Main function to run the Streamlit app
 def main():
-    st.set_page_config(page_title="Energy Data Analysis", page_icon=":bar_chart:", layout="wide")
-
-    # Create SQLite database connection
-    db_conn = sqlite3.connect('users.db')
-
-    # Create users table if not exists
-    cursor = db_conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    ''')
-    db_conn.commit()
-
+    st.set_page_config(page_title="Energy Data Analysis Dashboard", layout="wide")
+    
+    # Attempt to connect to MySQL
+    db_conn = None
+    try:
+        db_engine = create_engine('mysql+pymysql://root:root@localhost:3308/assignment')  # Update with your database details
+        db_conn = db_engine.connect()
+        db_conn.close()
+        db_conn = sqlite3.connect('fallback.db')  # Fallback SQLite database
+        cursor = db_conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users
+                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           username TEXT NOT NULL,
+                           email TEXT NOT NULL UNIQUE,
+                           password TEXT NOT NULL)''')
+        db_conn.commit()
+    except OperationalError:
+        st.error("MySQL connection failed. Falling back to SQLite.")
+        db_conn = sqlite3.connect('fallback.db')  # Fallback SQLite database
+        cursor = db_conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users
+                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           username TEXT NOT NULL,
+                           email TEXT NOT NULL UNIQUE,
+                           password TEXT NOT NULL)''')
+        db_conn.commit()
+    
     # Show login or sign-up page if not logged in
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
-
+    
     if st.session_state['logged_in']:
         show_analysis_page()
     else:
         page = st.sidebar.selectbox("Select Page", ["Login", "Sign-Up"])
-
+        
         if page == "Login":
             show_login_page(db_conn)
         elif page == "Sign-Up":
