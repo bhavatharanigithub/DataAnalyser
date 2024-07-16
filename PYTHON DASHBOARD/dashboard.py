@@ -12,8 +12,12 @@ def login(db_conn, email, password):
     cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
     user = cursor.fetchone()
     
+    st.write(f"Email: {email}")
+    st.write(f"Hashed Password: {hashed_password}")
+    
     if user:
         stored_password = user[3]  # Ensure this index is correct for the password column
+        st.write(f"Stored Password: {stored_password}")
         if stored_password == hashed_password:
             return user
         else:
@@ -190,6 +194,7 @@ def show_analysis_page():
                 fig = px.scatter(df_filtered, x="intensity", y="likelihood", size="relevance", color="country", title='Bubble Plot of Intensity vs Likelihood')
                 st.plotly_chart(fig)
 
+
 # Main function for Streamlit app
 def main():
     st.set_page_config(page_title="Energy Data Analysis", page_icon=":bar_chart:", layout="wide")
@@ -209,22 +214,22 @@ def main():
     ''')
     db_conn.commit()
 
-    # Check if logged in
+    # Show login or sign-up page if not logged in
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
 
-    if not st.session_state['logged_in']:
-        login_mode = st.sidebar.radio("Choose action", ("Login", "Sign-Up"))
-        if login_mode == "Login":
-            show_login_page(db_conn)
-        elif login_mode == "Sign-Up":
-            show_signup_page(db_conn)
-    else:
+    if st.session_state['logged_in']:
         show_analysis_page()
+    else:
+        page = st.sidebar.selectbox("Select Page", ["Login", "Sign-Up"])
+
+        if page == "Login":
+            show_login_page(db_conn)
+        elif page == "Sign-Up":
+            show_signup_page(db_conn)
 
 if __name__ == "__main__":
     main()
-
 
 
 
