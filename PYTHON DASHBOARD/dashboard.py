@@ -233,7 +233,7 @@ def main():
     
     if st.session_state['logged_in']:
         # Load data from JSON file
-        df = load_data_from_json('data.json')
+        df = load_data_from_json('jsondata.json')
         show_analysis_page(df)
     else:
         login_or_signup = st.sidebar.radio("Login or Sign-Up", ("Login", "Sign-Up"))
