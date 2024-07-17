@@ -29,9 +29,56 @@ def load_data_from_json(filepath):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
+        
+        # Check if data is not empty
+        if not data:
+            st.error("Error loading JSON data: File is empty.")
+            return pd.DataFrame()
+
+        # Normalize JSON data into DataFrame
         df = pd.json_normalize(data)
+
+        # Ensure all expected columns exist, handle missing columns
+        expected_columns = ['end_year', 'intensity', 'sector', 'topic', 'insight', 'url', 'region',
+                            'start_year', 'impact', 'country', 'relevance', 'pestle', 'source',
+                            'title', 'likelihood', 'published']
+        
+        missing_columns = [col for col in expected_columns if col not in df.columns]
+        if missing_columns:
+            st.warning(f"Missing columns in data: {', '.join(missing_columns)}")
+            for col in missing_columns:
+                df[col] = ''  # Handle missing columns by setting them to empty
+        
+        # Handle null values
+        df.fillna({
+            'end_year': 'Unknown',
+            'intensity': 0,
+            'sector': 'Unknown',
+            'topic': 'Unknown',
+            'insight': 'No Insight',
+            'url': 'No URL',
+            'region': 'Unknown',
+            'start_year': 'Unknown',
+            'impact': 'No Impact',
+            'country': 'Unknown',
+            'relevance': 0,
+            'pestle': 'Unknown',
+            'source': 'Unknown',
+            'title': 'No Title',
+            'likelihood': 0
+        }, inplace=True)
+
+        # Convert 'published' to datetime
+        if "published" in df.columns:
+            df["published"] = pd.to_datetime(df["published"], errors='coerce')
+            df.dropna(subset=["published"], inplace=True)
+
         return df
-    except Exception as e:
+
+    except FileNotFoundError:
+        st.error(f"Error loading JSON data: File '{filepath}' not found.")
+        return pd.DataFrame()
+    except json.JSONDecodeError as e:
         st.error(f"Error loading JSON data: {e}")
         return pd.DataFrame()
 
@@ -84,23 +131,6 @@ def show_analysis_page(df):
     # Remove leading and trailing spaces in all string columns
     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
     
-    # Handle null values
-    df['end_year'].fillna('Unknown', inplace=True)
-    df['intensity'].fillna(0, inplace=True)
-    df['sector'].fillna('Unknown', inplace=True)
-    df['topic'].fillna('Unknown', inplace=True)
-    df['insight'].fillna('No Insight', inplace=True)
-    df['url'].fillna('No URL', inplace=True)
-    df['region'].fillna('Unknown', inplace=True)
-    df['start_year'].fillna('Unknown', inplace=True)
-    df['impact'].fillna('No Impact', inplace=True)
-    df['country'].fillna('Unknown', inplace=True)
-    df['relevance'].fillna(0, inplace=True)
-    df['pestle'].fillna('Unknown', inplace=True)
-    df['source'].fillna('Unknown', inplace=True)
-    df['title'].fillna('No Title', inplace=True)
-    df['likelihood'].fillna(0, inplace=True)
-
     # Ensure 'published' field is used as the date field
     if "published" in df.columns:
         df["published"] = pd.to_datetime(df["published"], errors='coerce')
@@ -183,7 +213,7 @@ def show_analysis_page(df):
             st.plotly_chart(fig)
 
     else:
-        st.warning("No data found.")
+        st.warning("No 'published' column found in data.")
 
 # Main function to run the Streamlit app
 def main():
@@ -195,7 +225,8 @@ def main():
         with open('users.json', 'r', encoding='utf-8') as f:
             users = json.load(f)
     except FileNotFoundError:
-        pass
+        with open('users.json', 'w', encoding='utf-8') as f:
+            json.dump(users, f)
     
     if 'logged_in' not in st.session_state:
         st.session_state['logged_in'] = False
@@ -217,6 +248,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
