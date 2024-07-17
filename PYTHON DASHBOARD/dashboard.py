@@ -174,11 +174,8 @@ def show_analysis_page(df):
             
             df_filtered.dropna(subset=['intensity', 'likelihood', 'relevance'], inplace=True)
 
-            st.subheader("Summary Statistics")
-            st.write(df_filtered.describe())
             
-            # Visualizations
-            st.subheader("Visualizations")
+            
             
             # Line Chart
             st.write("### Intensity over Time")
@@ -201,25 +198,20 @@ def show_analysis_page(df):
             fig = px.histogram(df_filtered, x="intensity", nbins=50, title='Distribution of Intensity')
             st.plotly_chart(fig)
             
-            # Heatmap
-            st.write("### Heatmap of Intensity by Region and Sector")
-            heatmap_data = df_filtered.pivot_table(index='region', columns='sector', values='intensity', aggfunc='mean')
-            fig = px.imshow(heatmap_data, title='Heatmap of Intensity by Region and Sector')
-            st.plotly_chart(fig)
             
-            # Bubble Plot
             st.write("### Intensity vs Likelihood")
-            fig = px.scatter(df_filtered, x="intensity", y="likelihood", size="relevance", color="country", title='Bubble Plot of Intensity vs Likelihood')
+            fig = px.scatter(df_filtered, x="intensity", y="likelihood", title='Scatter Plot of Intensity vs Likelihood')
             st.plotly_chart(fig)
+
 
     else:
         st.warning("No 'published' column found in data.")
 
-# Main function to run the Streamlit app
+
 def main():
     st.set_page_config(page_title="Energy Data Analysis Dashboard", layout="wide")
     
-    # Load user data from JSON
+    
     users = []
     try:
         with open('users.json', 'r', encoding='utf-8') as f:
@@ -242,13 +234,12 @@ def main():
         else:
             show_signup_page(users)
 
-    # Save user data to JSON
+    
     with open('users.json', 'w', encoding='utf-8') as f:
         json.dump(users, f)
 
 if __name__ == "__main__":
     main()
-
 
 
 
