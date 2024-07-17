@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Data Visualization</title>
   <link rel="stylesheet" href="styles.css">
-  <!-- Add Plotly.js for interactive charts -->
+  
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
@@ -15,11 +15,11 @@
     </header>
     <main>
       <section class="visualization">
-        <!-- Placeholder for data visualization -->
+      
         <div id="chart"></div>
       </section>
       <section class="filters">
-        <!-- Filters or controls for data selection -->
+      
         <h2>Filters</h2>
         <form id="filter-form">
           <label for="start-date">Start Date:</label>
@@ -41,21 +41,19 @@
     </footer>
   </div>
 
-  <!-- JavaScript for handling form submission and updating charts -->
   <script>
-    // Example JavaScript for handling form submission and updating charts
     document.getElementById('filter-form').addEventListener('submit', function(event) {
-      event.preventDefault(); // Prevent form submission
-      updateChart(); // Call function to update chart based on filters
+      event.preventDefault(); 
+      updateChart();
     });
 
     function updateChart() {
-      // Replace with your actual data retrieval and chart update logic using Plotly.js
+      
       const startDate = document.getElementById('start-date').value;
       const endDate = document.getElementById('end-date').value;
       const region = document.getElementById('region').value;
 
-      // Example Plotly chart update (replace with your actual chart configuration)
+      
       const data = [{
         x: [1, 2, 3, 4, 5],
         y: [10, 15, 13, 17, 11],
